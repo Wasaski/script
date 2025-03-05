@@ -1,467 +1,410 @@
---[[
-DISCLAIMER:
-Este script é para fins experimentais e educativos no contexto de um jogo de sua propriedade.
-Use-o com cautela, esteja ciente de que funcionalidades como ESP, Fling e similares podem
-afetar a jogabilidade e, se mal utilizadas, gerar problemas. Certifique-se de seguir as diretrizes
-do Roblox e de manter o equilíbrio na experiência dos jogadores.
---]]
+--// UI Library (Use sua preferida, esta é um exemplo básico)
+local Library = {}
 
------------------------------
--- Serviços e variáveis
------------------------------
+function Library:CreateWindow(title)
+    local window = Instance.new("ScreenGui")
+    window.Name = "CheatMenu"
+    window.ResetOnSpawn = false
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 400)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -200)
+    frame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    frame.BorderSizePixel = 0
+    frame.Parent = window
+
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1, 0, 0, 30)
+    titleBar.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = frame
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 1, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.TextColor3 = Color3.new(1, 1, 1)
+    titleLabel.Text = title
+    titleLabel.Font = Enum.Font.SourceSansBold
+    titleLabel.TextSize = 16
+    titleLabel.Parent = titleBar
+
+	local closeButton = Instance.new("TextButton")
+	closeButton.Size = UDim2.new(0,30,0,30)
+	closeButton.Position = UDim2.new(1,-30,0,0)
+	closeButton.BackgroundColor3 = Color3.new(1,0,0)
+	closeButton.Text = "X"
+	closeButton.TextColor3 = Color3.new(1,1,1)
+	closeButton.Font = Enum.Font.SourceSansBold
+	closeButton.TextSize = 16
+	closeButton.BorderSizePixel = 0
+	closeButton.Parent = titleBar
+	closeButton.MouseButton1Click:Connect(function()
+		window:Destroy()
+	end)
+
+
+    return frame
+end
+
+function Library:CreateButton(parent, text, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -20, 0, 30)
+    button.Position = UDim2.new(0, 10, 0, #parent:GetChildren() * 35 + 5) -- Spacing
+    button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Text = text
+    button.Font = Enum.Font.SourceSans
+    button.TextSize = 14
+    button.BorderSizePixel = 0
+    button.Parent = parent
+
+    button.MouseButton1Click:Connect(callback)
+    return button
+end
+
+function Library:CreateToggle(parent, text, defaultState, callback)
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Size = UDim2.new(1, -20, 0, 30)
+    toggleFrame.Position = UDim2.new(0, 10, 0, #parent:GetChildren() * 35 + 5) -- Spacing
+    toggleFrame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    toggleFrame.BorderSizePixel = 0
+    toggleFrame.Parent = parent
+
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(0, 60, 0, 25)
+    toggleButton.Position = UDim2.new(1, -70, 0, 2.5)
+    toggleButton.BackgroundColor3 = defaultState and Color3.new(0, 0.7, 0) or Color3.new(0.7, 0, 0)
+    toggleButton.TextColor3 = Color3.new(1, 1, 1)
+    toggleButton.Text = defaultState and "ON" or "OFF"
+    toggleButton.Font = Enum.Font.SourceSans
+    toggleButton.TextSize = 14
+    toggleButton.BorderSizePixel = 0
+    toggleButton.Parent = toggleFrame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -70, 1, 0)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Text = text
+    label.Font = Enum.Font.SourceSans
+    label.TextSize = 14
+    label.Parent = toggleFrame
+
+    local state = defaultState
+
+    toggleButton.MouseButton1Click:Connect(function()
+        state = not state
+        toggleButton.Text = state and "ON" or "OFF"
+        toggleButton.BackgroundColor3 = state and Color3.new(0, 0.7, 0) or Color3.new(0.7, 0, 0)
+        callback(state)
+    end)
+
+    return toggleFrame
+end
+
+--// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Debris = game:GetService("Debris")
-local UIS = game:GetService("UserInputService")
-local localPlayer = Players.LocalPlayer
-local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local rootPart = character:WaitForChild("HumanoidRootPart")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
--- Estados iniciais e valores padrão
-local espEnabled = false
-local flyEnabled = false
-local invisEnabled = false
-local flingEnabled = false
-local speedHackEnabled = false
-local superJumpEnabled = false
-local noClipEnabled = false
-local godModeEnabled = false
-local removeAnimsEnabled = false
+--// Variables
+local Flying = false
+local Invisible = false
+local Speed = 50 -- Default speed
+local JumpPower = 50 -- Default JumpPower
+local GodModeEnabled = false
+local NoClipEnabled = false
 
-local defaultWalkSpeed = humanoid.WalkSpeed
-local defaultJumpPower = humanoid.JumpPower
+--// Functions
 
------------------------------
--- Criar interface gráfica (GUI)
------------------------------
-local screenGui = Instance.new("ScreenGui")
-screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+--// ESP
+local function createESP(player)
+	if player and player.Character and player.Character:FindFirstChild("Head") and player ~= LocalPlayer then
+		local Head = player.Character:FindFirstChild("Head")
+		if Head then
+			local Box = Instance.new("BillboardGui")
+			Box.Name = "ESP"
+			Box.Adornee = Head
+			Box.Size = UDim2.new(0,50,0,50)
+			Box.AlwaysOnTop = true
+			Box.StudsOffsetWorldSpace = Vector3.new(0, 1.5, 0)
+			Box.Parent = Head
 
-local frame = Instance.new("Frame")
-frame.Parent = screenGui
-frame.Size = UDim2.new(0, 250, 0, 550)
-frame.Position = UDim2.new(0, 50, 0, 50)
-frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-frame.BorderSizePixel = 0
+			local Frame = Instance.new("Frame")
+			Frame.Size = UDim2.new(1,0,1,0)
+			Frame.BackgroundTransparency = 0.5
+			Frame.BackgroundColor3 = Color3.new(1,1,1)
+			Frame.Parent = Box
 
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.Text = "Painel de Funcionalidades"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.SourceSansBold
-title.TextScaled = true
-
--- Função auxiliar para criar botões
-local function createButton(text, posY)
-    local btn = Instance.new("TextButton")
-    btn.Parent = frame
-    btn.Size = UDim2.new(0, 230, 0, 30)
-    btn.Position = UDim2.new(0, 10, 0, posY)
-    btn.Text = text .. " OFF"
-    btn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextScaled = true
-    return btn
+			local TextLabel = Instance.new("TextLabel")
+			TextLabel.Size = UDim2.new(1,0,0.5,0)
+			TextLabel.Position = UDim2.new(0,0,1,-0.5)
+			TextLabel.BackgroundTransparency = 1
+			TextLabel.TextColor3 = Color3.new(1,1,1)
+			TextLabel.Text = player.Name
+			TextLabel.Font = Enum.Font.SourceSansBold
+			TextLabel.TextSize = 14
+			TextLabel.Parent = Frame
+		end
+	end
 end
 
-local closeButton = createButton("Fechar Painel", 40)
-local espButton = createButton("ESP", 80)
-local teleportButton = createButton("Teleport", 120)
-local flyButton = createButton("Fly", 160)
-local invisButton = createButton("Invisibilidade", 200)
-local flingButton = createButton("Fling", 240)
-local speedButton = createButton("Speed Hack", 280)
-local jumpButton = createButton("Super Jump", 320)
-local noClipButton = createButton("NoClip", 360)
-local godModeButton = createButton("God Mode", 400)
-local removeAnimsButton = createButton("Remover Anims", 440)
-local destroyMapButton = createButton("Destruir Mapa", 480)
-local moreFuncButton = createButton("Nova Funcionalidade", 520)
+local function removeESP(player)
+	if player and player.Character then
+		for i,v in pairs(player.Character:GetChildren()) do
+			if v:IsA("BillboardGui") and v.Name == "ESP" then
+				v:Destroy()
+			end
+		end
+	end
+end
 
--- Criar um TextBox para informar o nome do jogador alvo para Teleporte
-local teleportTextBox = Instance.new("TextBox")
-teleportTextBox.Parent = frame
-teleportTextBox.Size = UDim2.new(0, 230, 0, 30)
-teleportTextBox.Position = UDim2.new(0, 10, 0, 155)
-teleportTextBox.PlaceholderText = "Nome do jogador alvo"
-teleportTextBox.Visible = false
-
------------------------------
--- Função para fechar painel
------------------------------
-closeButton.MouseButton1Click:Connect(function()
-    screenGui.Enabled = false
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function(character)
+		wait(1)
+		createESP(player)
+	end)
+	createESP(player)
 end)
 
------------------------------
--- Abrir painel com Ctrl esquerdo
------------------------------
-UIS.InputBegan:Connect(function(input, gameProcessedEvent)
-    if input.KeyCode == Enum.KeyCode.LeftControl then
-        screenGui.Enabled = not screenGui.Enabled
-    end
+Players.PlayerRemoving:Connect(function(player)
+	removeESP(player)
 end)
 
------------------------------
--- 1. ESP (Exibição de nomes dos jogadores)
------------------------------
-local function addESP(character)
-    if character and character:FindFirstChild("Head") and not character.Head:FindFirstChild("ESPLabel") then
-        local billboard = Instance.new("BillboardGui")
-        billboard.Name = "ESPLabel"
-        billboard.Adornee = character:FindFirstChild("Head")
-        billboard.Size = UDim2.new(0, 100, 0, 50)
-        billboard.AlwaysOnTop = true
-        billboard.Parent = character:FindFirstChild("Head")
-        
-        local textLabel = Instance.new("TextLabel", billboard)
-        textLabel.Size = UDim2.new(1, 0, 1, 0)
-        textLabel.BackgroundTransparency = 1
-        textLabel.Text = character.Name
-        textLabel.TextColor3 = Color3.new(1, 0, 0)
-        textLabel.TextScaled = true
-    end
+for i, player in pairs(Players:GetPlayers()) do
+	if player.Character then
+		createESP(player)
+	end
+end
+--// Teleport to Player
+local function TeleportToPlayer(playerName)
+	for i, player in pairs(Players:GetPlayers()) do
+		if player.Name == playerName and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			LocalPlayer.Character:MoveTo(player.Character.HumanoidRootPart.Position)
+			break
+		end
+	end
 end
 
-local function removeESP(character)
-    if character and character:FindFirstChild("Head") then
-        local label = character.Head:FindFirstChild("ESPLabel")
-        if label then
-            label:Destroy()
-        end
-    end
-end
-
-local function toggleESP(enabled)
-    espEnabled = enabled
-    if enabled then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= localPlayer and player.Character then
-                addESP(player.Character)
-            end
-            player.CharacterAdded:Connect(function(char)
-                wait(0.5)
-                if espEnabled and player ~= localPlayer then
-                    addESP(char)
-                end
-            end)
-        end
+--// Fly
+local function ToggleFly(state)
+    Flying = state
+    if Flying then
+        Humanoid.PlatformStand = true
+        Humanoid.JumpPower = 0
     else
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= localPlayer and player.Character then
-                removeESP(player.Character)
-            end
-        end
+        Humanoid.PlatformStand = false
+        Humanoid.JumpPower = JumpPower -- Restore original jump power
     end
 end
 
-espButton.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    if espEnabled then
-        espButton.Text = "ESP ON"
-    else
-        espButton.Text = "ESP OFF"
-    end
-    toggleESP(espEnabled)
-end)
+RunService.RenderStepped:Connect(function()
+    if Flying then
+        HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+        HumanoidRootPart.CFrame = HumanoidRootPart.CFrame * CFrame.Angles(math.rad(-UserInputService:GetAxis("MoveForward", "MoveBackward") * 2), math.rad(-UserInputService:GetAxis("MoveLeft", "MoveRight") * 2),0)
 
------------------------------
--- 2. Teleporte para jogadores
------------------------------
-local teleportMode = false
-teleportButton.MouseButton1Click:Connect(function()
-    teleportMode = not teleportMode
-    if teleportMode then
-        teleportButton.Text = "Teleport ON"
-        teleportTextBox.Visible = true
-    else
-        teleportButton.Text = "Teleport OFF"
-        teleportTextBox.Visible = false
-    end
-end)
-
-local function teleportToPlayer(targetName)
-    local targetPlayer = Players:FindFirstChild(targetName)
-    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
-        end
-    end
-end
-
-teleportTextBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        teleportToPlayer(teleportTextBox.Text)
-    end
-end)
-
------------------------------
--- 3. Voo
------------------------------
-local flySpeed = 50
-local flyConnection, bodyVelocity, bodyGyro
-
-local function startFly()
-    if not character or not rootPart then return end
-    bodyVelocity = Instance.new("BodyVelocity", rootPart)
-    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-    
-    bodyGyro = Instance.new("BodyGyro", rootPart)
-    bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-    
-    flyConnection = RunService.RenderStepped:Connect(function()
-        local direction = Vector3.new(0, 0, 0)
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            direction = direction + workspace.CurrentCamera.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            direction = direction - workspace.CurrentCamera.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            direction = direction - workspace.CurrentCamera.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            direction = direction + workspace.CurrentCamera.CFrame.RightVector
-        end
         if UserInputService:IsKeyDown(Enum.KeyCode.E) then
-            direction = direction + Vector3.new(0, 1, 0)
+            HumanoidRootPart.CFrame = HumanoidRootPart.CFrame + Vector3.new(0, Speed/10, 0)
+        elseif UserInputService:IsKeyDown(Enum.KeyCode.Q) then
+            HumanoidRootPart.CFrame = HumanoidRootPart.CFrame + Vector3.new(0, -Speed/10, 0)
         end
-        if bodyGyro.CFrame = workspace.CurrentCamera.CFrame
-    end)
-end
 
-local function stopFly()
-    if bodyVelocity then bodyVelocity:Destroy() end
-    if bodyGyro then bodyGyro:Destroy() end
-    if flyConnection then flyConnection:Disconnect() end
-end
-
-flyButton.MouseButton1Click:Connect(function()
-    flyEnabled = not flyEnabled
-    if flyEnabled then
-        flyButton.Text = "Fly ON"
-        startFly()
-    else
-        flyButton.Text = "Fly OFF"
-        stopFly()
+        local moveVector = Vector3.new(UserInputService:GetAxis("MoveLeft", "MoveRight"), 0, UserInputService:GetAxis("MoveForward", "MoveBackward")).Unit
+        HumanoidRootPart.CFrame = HumanoidRootPart.CFrame + moveVector * Speed/5
     end
 end)
 
------------------------------
--- 4. Invisibilidade
------------------------------
-local function setInvisibility(on)
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if on then
-                part.Transparency = 1
-                -- Caso haja decals, ajusta-os também
-                for _, d in pairs(part:GetChildren()) do
-                    if d:IsA("Decal") then
-                        d.Transparency = 1
-                    end
-                end
-            else
-                part.Transparency = 0
-                for _, d in pairs(part:GetChildren()) do
-                    if d:IsA("Decal") then
-                        d.Transparency = 0
-                    end
-                end
-            end
-        end
-    end
+--// Invisibility
+local function ToggleInvisibility(state)
+	Invisible = state
+	for i, v in pairs(Character:GetDescendants()) do
+		if v:IsA("BasePart") then
+			v.Transparency = Invisible and 1 or 0
+		end
+	end
 end
 
-invisButton.MouseButton1Click:Connect(function()
-    invisEnabled = not invisEnabled
-    if invisEnabled then
-        invisButton.Text = "Invisibilidade ON"
-        setInvisibility(true)
-    else
-        invisButton.Text = "Invisibilidade OFF"
-        setInvisibility(false)
-    end
-end)
-
------------------------------
--- 5. Fling (Empurrar inimigos ao tocar)
------------------------------
-local flingConnection
-local function startFling()
-    flingConnection = rootPart.Touched:Connect(function(hit)
-        local hitCharacter = hit.Parent
-        local hitHumanoid = hitCharacter and hitCharacter:FindFirstChildWhichIsA("Humanoid")
-        if hitCharacter and hitCharacter ~= character and hitHumanoid then
-            local hrp = hitCharacter:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local bv = Instance.new("BodyVelocity", hrp)
-                bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-                bv.Velocity = (hrp.Position - rootPart.Position).Unit * 100
-                Debris:AddItem(bv, 0.5)
-            end
-        end
-    end)
+--// Fling
+local function Fling(target)
+	if target and target:IsA("Humanoid") and target.Parent:FindFirstChild("HumanoidRootPart") then
+		local hrp = target.Parent:FindFirstChild("HumanoidRootPart")
+		hrp.Velocity = Vector3.new(math.random(-500, 500), 500, math.random(-500, 500))
+	end
 end
 
-local function stopFling()
-    if flingConnection then flingConnection:Disconnect() end
+--// Speed Hack
+local function SetSpeed(speed)
+	Humanoid.WalkSpeed = speed
 end
 
-flingButton.MouseButton1Click:Connect(function()
-    flingEnabled = not flingEnabled
-    if flingEnabled then
-        flingButton.Text = "Fling ON"
-        startFling()
-    else
-        flingButton.Text = "Fling OFF"
-        stopFling()
-    end
-end)
-
------------------------------
--- 6. Speed Hack (Aumenta a velocidade de caminhada)
------------------------------
-local speedHackValue = 100
-speedButton.MouseButton1Click:Connect(function()
-    speedHackEnabled = not speedHackEnabled
-    if speedHackEnabled then
-        speedButton.Text = "Speed Hack ON"
-        humanoid.WalkSpeed = speedHackValue
-    else
-        speedButton.Text = "Speed Hack OFF"
-        humanoid.WalkSpeed = defaultWalkSpeed
-    end
-end)
-
------------------------------
--- 7. Super Jump (Aumenta a força de pulo)
------------------------------
-local superJumpValue = 150
-jumpButton.MouseButton1Click:Connect(function()
-    superJumpEnabled = not superJumpEnabled
-    if superJumpEnabled then
-        jumpButton.Text = "Super Jump ON"
-        humanoid.JumpPower = superJumpValue
-    else
-        jumpButton.Text = "Super Jump OFF"
-        humanoid.JumpPower = defaultJumpPower
-    end
-end)
-
------------------------------
--- 8. NoClip (Atravessa paredes)
------------------------------
-local noClipConnection
-local function startNoClip()
-    noClipConnection = RunService.Stepped:Connect(function()
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
-    end)
+--// Super Jump
+local function SetJumpPower(jumpPower)
+	JumpPower = jumpPower
+	Humanoid.JumpPower = jumpPower
 end
 
-local function stopNoClip()
-    if noClipConnection then noClipConnection:Disconnect() end
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = true
+--// NoClip
+local function ToggleNoClip(state)
+	NoClipEnabled = state
+	for i, v in pairs(Character:GetDescendants()) do
+		if v:IsA("BasePart") then
+			v.CanCollide = not NoClipEnabled
+		end
+	end
+end
+
+--// God Mode (Basic Example, Game Dependent)
+local function ToggleGodMode(state)
+    GodModeEnabled = state
+	--  A implementacao do GodMode DEPENDE do jogo. Voce precisaria interceptar o dano
+	--  O ideal e substituir a funcao TakeDamage do humanoid para previnir a morte.
+	--  Este exemplo eh SIMPLIFICADO e pode nao funcionar em todos os jogos.
+	--  Em jogos que usam scripts customizados de dano, sera necessario encontrar
+	--  e modificar esses scripts diretamente, o que eh mais avancado.
+
+	-- Exemplo basico: Modificar a health do Humanoid
+	if GodModeEnabled then
+		Humanoid.MaxHealth = 99999
+		Humanoid.Health = 99999
+	else
+		Humanoid.MaxHealth = 100
+		Humanoid.Health = 100
+	end
+end
+
+--// Remove Ragdoll
+local function RemoveRagdoll()
+    for i, v in pairs(Character:GetDescendants()) do
+        if v:IsA("Motor6D") then
+            v.Enabled = true
         end
     end
 end
 
-noClipButton.MouseButton1Click:Connect(function()
-    noClipEnabled = not noClipEnabled
-    if noClipEnabled then
-        noClipButton.Text = "NoClip ON"
-        startNoClip()
-    else
-        noClipButton.Text = "NoClip OFF"
-        stopNoClip()
-    end
-end)
-
------------------------------
--- 9. God Mode (Mantém o jogador com saúde máxima)
------------------------------
-local godModeConnection
-local function startGodMode()
-    godModeConnection = RunService.Heartbeat:Connect(function()
-        if humanoid then
-            humanoid.Health = humanoid.MaxHealth
-        end
-    end)
-end
-
-local function stopGodMode()
-    if godModeConnection then godModeConnection:Disconnect() end
-end
-
-godModeButton.MouseButton1Click:Connect(function()
-    godModeEnabled = not godModeEnabled
-    if godModeEnabled then
-        godModeButton.Text = "God Mode ON"
-        startGodMode()
-    else
-        godModeButton.Text = "God Mode OFF"
-        stopGodMode()
-    end
-end)
-
------------------------------
--- 10. Remover Animações de RagDoll/Morte (experimental)
------------------------------
-local function removeAnimations()
-    -- ATENÇÃO: Uma vez removidas, as animações não serão restauradas automaticamente.
-    for _, obj in pairs(character:GetDescendants()) do
-        if obj:IsA("Animation") then
+--// Destroy Map (Extremely Experimental and Likely to Cause Lag)
+local function DestroyMap()
+    for i, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Anchored == true then
             obj:Destroy()
         end
     end
 end
 
-removeAnimsButton.MouseButton1Click:Connect(function()
-    removeAnimsEnabled = not removeAnimsEnabled
-    if removeAnimsEnabled then
-        removeAnimsButton.Text = "Remover Anims ON"
-        removeAnimations()
-    else
-        removeAnimsButton.Text = "Remover Anims OFF"
-        print("Reinicie o jogo para restaurar as animações.")
-    end
+--// User Input Service (For Fly)
+local UserInputService = game:GetService("UserInputService")
+
+--// UI Creation
+local window = Library:CreateWindow("Cheat Menu")
+
+--// ESP Button (Lista de jogadores com botão de teleporte)
+Library:CreateButton(window, "Mostrar Lista de Jogadores", function()
+	local playerListWindow = Library:CreateWindow("Jogadores")
+	playerListWindow.Size = UDim2.new(0, 200, 0, 300)
+	playerListWindow.Position = UDim2.new(0.2, -100, 0.5, -150)
+
+	for i, player in pairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			Library:CreateButton(playerListWindow, player.Name, function()
+				TeleportToPlayer(player.Name)
+				playerListWindow.Parent:Destroy() -- Fecha a lista apos o teleporte
+			end)
+		end
+	end
 end)
 
------------------------------
--- 11. Destruir Mapa (Experimental)
------------------------------
-local function isPlayerCharacter(model)
-    return model:IsA("Model") and model:FindFirstChild("Humanoid")
-end
+--// Toggle Buttons
+Library:CreateToggle(window, "Fly", false, ToggleFly)
+Library:CreateToggle(window, "Invisibility", false, ToggleInvisibility)
+Library:CreateToggle(window, "NoClip", false, ToggleNoClip)
+Library:CreateToggle(window, "God Mode", false, ToggleGodMode)
 
-local function destroyMap()
-    for _, obj in pairs(workspace:GetChildren()) do
-        if not isPlayerCharacter(obj) and obj.Name ~= "Terrain" then
-            pcall(function() obj:Destroy() end)
-        end
-    end
-end
+--// Fling Button (Ação ao tocar)
+--// Speed Hack Buttons
+local speedFrame = Instance.new("Frame")
+speedFrame.Size = UDim2.new(1, -20, 0, 30)
+speedFrame.Position = UDim2.new(0, 10, 0, #window:GetChildren() * 35 + 5)
+speedFrame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+speedFrame.BorderSizePixel = 0
+speedFrame.Parent = window
 
-destroyMapButton.MouseButton1Click:Connect(function()
-    destroyMapButton.Text = "Mapa Destruído"
-    destroyMap()
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(0.5, 0, 1, 0)
+speedLabel.Position = UDim2.new(0, 0, 0, 0)
+speedLabel.BackgroundTransparency = 1
+speedLabel.TextColor3 = Color3.new(1, 1, 1)
+speedLabel.Text = "Velocidade:"
+speedLabel.Font = Enum.Font.SourceSans
+speedLabel.TextSize = 14
+speedLabel.Parent = speedFrame
+
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(0.5, 0, 1, 0)
+speedBox.Position = UDim2.new(0.5, 0, 0, 0)
+speedBox.Text = tostring(Speed)
+speedBox.Font = Enum.Font.SourceSans
+speedBox.TextSize = 14
+speedBox.Parent = speedFrame
+
+speedBox.FocusLost:Connect(function()
+	local newSpeed = tonumber(speedBox.Text)
+	if newSpeed then
+		Speed = newSpeed
+		SetSpeed(Speed)
+	else
+		speedBox.Text = tostring(Speed)
+	end
 end)
 
------------------------------
--- 12. Nova Funcionalidade (Exemplo)
------------------------------
-moreFuncButton.MouseButton1Click:Connect(function()
-    moreFuncButton.Text = "Nova Func ON"
-    -- Insira aqui a nova funcionalidade desejada
+--// Jump Power Buttons
+local jumpFrame = Instance.new("Frame")
+jumpFrame.Size = UDim2.new(1, -20, 0, 30)
+jumpFrame.Position = UDim2.new(0, 10, 0, #window:GetChildren() * 35 + 5)
+jumpFrame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+jumpFrame.BorderSizePixel = 0
+jumpFrame.Parent = window
+
+local jumpLabel = Instance.new("TextLabel")
+jumpLabel.Size = UDim2.new(0.5, 0, 1, 0)
+jumpLabel.Position = UDim2.new(0, 0, 0, 0)
+jumpLabel.BackgroundTransparency = 1
+jumpLabel.TextColor3 = Color3.new(1, 1, 1)
+jumpLabel.Text = "Pulo:"
+jumpLabel.Font = Enum.Font.SourceSans
+jumpLabel.TextSize = 14
+jumpLabel.Parent = jumpFrame
+
+local jumpBox = Instance.new("TextBox")
+jumpBox.Size = UDim2.new(0.5, 0, 1, 0)
+jumpBox.Position = UDim2.new(0.5, 0, 0, 0)
+jumpBox.Text = tostring(JumpPower)
+jumpBox.Font = Enum.Font.SourceSans
+jumpBox.TextSize = 14
+jumpBox.Parent = jumpFrame
+
+jumpBox.FocusLost:Connect(function()
+	local newJump = tonumber(jumpBox.Text)
+	if newJump then
+		JumpPower = newJump
+		SetJumpPower(JumpPower)
+	else
+		jumpBox.Text = tostring(JumpPower)
+	end
 end)
+
+--// Fling
+Character.Touched:Connect(function(hit)
+	if hit and hit.Parent:FindFirstChild("Humanoid") then
+		Fling(hit.Parent:FindFirstChild("Humanoid"))
+	end
+end)
+
+--// Other Buttons
+Library:CreateButton(window, "Remover Ragdoll", RemoveRagdoll)
+--Library:CreateButton(window, "Destruir Mapa (Experimental)", DestroyMap) -- Cuidado, pode travar
+
+print("Cheat Menu Loaded!")
